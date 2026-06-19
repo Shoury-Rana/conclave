@@ -1,4 +1,5 @@
 from rest_framework import permissions
+from core.contexts import get_current_tenant_id
 
 
 class IsCreator(permissions.BasePermission):
