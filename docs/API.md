@@ -39,7 +39,7 @@
   ```
 
 ---
-### GET/PUT/PATCH `{{BASE_URL}}/profile/username/`
+### GET/PUT/PATCH `{{BASE_URL}}/profile/<user_id>/`
 - Details about the user.
 - Additionally, let user update their own profile.
 - Request:

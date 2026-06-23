@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.apps import apps
+from django.db import connection
 
 
 class ApplyRLS(BaseCommand):
@@ -19,9 +20,13 @@ class ApplyRLS(BaseCommand):
                 sql_command = [
                     f'ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY;',
                     f'ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY;',
-                    f'CREATE POLICY {table_name}_tenant_policy ON {table_name} FOR ALL\
-                        USING (tenant_id = current_setting("app.current_tenant", true)::UUID);'
+                    f"CREATE POLICY {table_name}_tenant_policy ON {table_name} FOR ALL\
+                        USING (tenant_id = current_setting('app.current_tenant', true)::UUID);"
                 ]
+
+                with connection.cursor() as cursor:
+                    for sql in sql_command:
+                        cursor.execute(sql)
 
                 self.stdout.write(self.style.SUCCESS(f'RLS successfully applied on {table_name}'))
             except Exception as e:

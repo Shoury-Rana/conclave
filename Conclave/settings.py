@@ -66,7 +66,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Conclave.wsgi.application'
 
-DATABASES = {       # Use PgBouncer for performance. Use 'transaction mode'
+DATABASES = {       # TODO: Use PgBouncer for performance. Use 'transaction mode'
     'default': dj_database_url.config()
 }
 
@@ -118,4 +118,4 @@ STATIC_URL = 'static/'
 
 AUTH_USER_MODEL = 'core.User'
 
-DOMAIN_LENGTH_AFTER_HTTPS = os.environ.get('DOMAIN_LENGTH_AFTER_HTTPS')
+BASE_DOMAIN_LENGTH = os.environ.get('BASE_DOMAIN_LENGTH')

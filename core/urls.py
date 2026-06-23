@@ -1,18 +1,16 @@
-from django.urls import path, include
-from rest_framework import routers
+from django.urls import path
 
 from core.views import (
-    SignupView, LoginView, TenantViewSet, CheckTenantExist
+    SignupView, LoginView, UserProfileView,
+    ListCreateTenantView
 )
 
-router = routers.SimpleRouter()
-router.register('tenant', TenantViewSet, basename='tenant')
-
 urlpatterns = [
-    path('exist/', CheckTenantExist.as_view(), name='check_tenant_exist'),
+    # Auth
     path('auth/signup/', SignupView.as_view(), name='signup-view'),
     path('auth/login/', LoginView.as_view(), name='login-view'),
+    path('profile/<name>/', UserProfileView.as_view(), name='user-profile-view'),
 
-    path('', include(router.urls))
+    # Tenants
+    path('tenant/', ListCreateTenantView.as_view(), name='list-create-tenant')
 ]
-

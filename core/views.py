@@ -1,8 +1,10 @@
 from django.contrib.auth import authenticate
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.generics import RetrieveAPIView, UpdateAPIView, RetrieveUpdateAPIView, ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.utils.representation import serializer_repr
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -13,18 +15,22 @@ from core.models import (
 )
 from core.permissions import IsCreator
 from core.serializers import (
-    AuthSerializer, TenantSerializer
+    SignupSerializer, LoginSerializer, UserProfileSerializer,
+    ListCreateTenantSerializer
 )
 
-
+@extend_schema(request=SignupSerializer)
 class SignupView(APIView):
     def post(self, request, *args, **kwargs):
-        serializer = AuthSerializer(data=request.data)
+        serializer = SignupSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data['email']
             password = serializer.validated_data['password']
+            name = serializer.validated_data['name']
 
-            user = User.objects.create_user(email=email, password=password)
+            if User.objects.filter(email=email).exists():
+                return Response('User already exists, please login instead.', status=status.HTTP_400_BAD_REQUEST)
+            user = User.objects.create_user(email=email, password=password, name=name)
             refresh_token = RefreshToken.for_user(user)
             return Response({
                     "refresh_token": str(refresh_token),
@@ -32,45 +38,37 @@ class SignupView(APIView):
                 }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@extend_schema(request=AuthSerializer)
+
+@extend_schema(request=LoginSerializer)
 class LoginView(APIView):
     def post(self, request, *args, **kwargs):
-        serializer = AuthSerializer(data=request.data)
+        serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data['email']
             password = serializer.validated_data['password']
 
-            user = User.objects.get(email=email)
-            if user and authenticate(email=email, password=password):
+            user = authenticate(request, email=email, password=password)
+            if user:
                 refresh_token = RefreshToken.for_user(user)
 
                 return Response({
                     "refresh_token": str(refresh_token),
-                    "access_token": str(refresh_token.access_token)
+                    "access_token": str(refresh_token.access_token),
+                    "user_id": user.id,
+                    "user_name": user.name
                 }, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response('Credential not found, make sure you have sign up first.', status=status.HTTP_400_BAD_REQUEST)
 
 
-class TenantViewSet(ModelViewSet):
-    queryset = Tenant.objects.all()
-    serializer_class = TenantSerializer
+class UserProfileView(RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated, IsCreator]
-    lookup_field = 'id'
+    serializer_class = UserProfileSerializer
+    lookup_field = 'name'
+    queryset = User.objects.all()
 
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
 
-
-class CheckTenantExist(APIView):
-    def get(self, request):
-        tenant = get_current_tenant_id()
-
-        if not tenant:
-            return Response('tenant does not exist. create new tenant if required.', status=status.HTTP_204_NO_CONTENT)
-
-        user_belong_to_tenant = Profile.objects.filter(tenant=tenant, user=request.user).exists()
-        if user_belong_to_tenant:
-            return Response({'tenant': tenant.id, 'tenant_name': tenant.name, 'belongs_to': user_belong_to_tenant}, status=status.HTTP_200_OK)
-        else:
-            return Response("User doesn't belong to this tenant", status=status.HTTP_400_BAD_REQUEST)
-
+@extend_schema(request=ListCreateTenantSerializer)
+class ListCreateTenantView(ListCreateAPIView):
+    serializer_class = ListCreateTenantSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = Tenant.objects.all()

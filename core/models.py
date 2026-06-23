@@ -8,7 +8,7 @@ from core.managers import UserManager
 
 class User(AbstractUser):       # No applied, as this is global ACL
     username = None
-    id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False) # Use uuid7 and indexes for performance, confirm whether it is supported yet or not.
+    id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False) # TODO: Use uuid7 and indexes for performance, confirm whether it is supported yet or not.
     email = models.EmailField(unique=True)
 
     name = models.CharField(null=False, blank=False)

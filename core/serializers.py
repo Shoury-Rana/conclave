@@ -5,22 +5,39 @@ from core.models import (
 )
 
 
-class AuthSerializer(ModelSerializer):
+class SignupSerializer(ModelSerializer):
     email = serializers.EmailField()
-    password = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+    name = serializers.CharField()
 
     class Meta:
         model = User
-        fields = ['email', 'password']
+        fields = ['email', 'password', 'name']
         extra_kwargs = {
-            'password': {'write_only': True}
+            'password': {'write_only': True},
         }
 
 
-class TenantSerializer(ModelSerializer):
-    name = serializers.CharField()
-    id = serializers.UUIDField(read_only=True)
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+
+class UserProfileSerializer(ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['email', 'name', 'tenants_joined']
+
+    def get_tenants_joined(self):
+        return Tenant.objects.all()
+
+
+class ListCreateTenantSerializer(ModelSerializer):
+    created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
         model = Tenant
-        fields = ['name', 'id']
+        fields = '__all__'
+        extra_kwargs = {
+            'id': {'read_only': True},
+        }
