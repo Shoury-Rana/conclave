@@ -113,15 +113,6 @@
   ```
   - 
   ```
-  
----
-### GET `*.{{BASE_URL}}/members/`
-- Detailed list of members of that specific tenant.
-- Response:
-  ```
-  - 
-  ```
-  
 
 ---
 

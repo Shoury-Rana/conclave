@@ -5,7 +5,7 @@ from django.db import transaction, connection
 from django.http import Http404, JsonResponse
 
 from core.models import Tenant
-from core.contexts import set_current_tenant_id
+from core.contexts import _current_tenant_id, set_current_tenant_id
 
 
 class SubDomainMiddleware:
@@ -19,12 +19,13 @@ class SubDomainMiddleware:
 
         self.ignored_patterns = []
         self.IGNORED_PATHS = [
-            ('GET', '^/$'),
             ('ANY', '^/admin/.*'),
             ('POST', '^/auth/signup/$'),
             ('POST', '^/auth/login/$'),
-            ('GET', '^/profile/username/$'),
+            ('GET', '^/profile/.*'),
             ('GET', '^/api/schema/.*'),
+            ('GET', '^/tenant/$'),
+            ('POST', '^/tenant/$')
         ]
         for method, route_path in self.IGNORED_PATHS:
             self.ignored_patterns.append((method, re.compile(route_path)))
@@ -33,28 +34,37 @@ class SubDomainMiddleware:
     def __call__(self, request):
         method = request.method
         path = request.path
-        is_ignored = any(route_method == 'ANY' or method == route_method and pattern.match(path)
-                         for route_method, pattern in self.ignored_patterns)
+
+        is_ignored = any(
+            route_method in ('ANY', method) and pattern.match(path)
+            for route_method, pattern in self.ignored_patterns
+        )
         if is_ignored:
             return self.get_response(request)
 
-
         host_parts = request.get_host().split(':')[0].split('.')
         base_domain_length = int(settings.BASE_DOMAIN_LENGTH)
-        if len(host_parts) == base_domain_length + 1:
+
+        if len(host_parts) == base_domain_length:
+            if method == 'GET' and path == '/':
+                return self.get_response(request)
+            raise Http404('Invalid Base Domain Route')
+
+        elif len(host_parts) == base_domain_length + 1:
             subdomain = host_parts[0]
             tenant = Tenant.objects.filter(name__iexact=subdomain).first()
 
-            if tenant:
-                with transaction.atomic():
-                    set_current_tenant_id(tenant)
+            if not tenant:
+                return JsonResponse({'error': 'Tenant not found.'}, status=404)
 
+            token = _current_tenant_id.set(tenant.id)
+            try:
+                with transaction.atomic():
                     with connection.cursor() as cursor:
                         cursor.execute(f"SET LOCAL app.current_tenant = '{tenant.id}';")
-
-                        response = self.get_response(request)
-                        return response
-            else:
-                return JsonResponse({'error': 'Tenant not found.'}, status=400)
+                    return self.get_response(request)
+            finally:
+                _current_tenant_id.reset(token)
         else:
-            raise Http404('Where are you trying to even go??')
+            raise Http404('Invalid Domain Configuration')
+

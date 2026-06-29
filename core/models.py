@@ -26,8 +26,8 @@ class User(AbstractUser):       # No applied, as this is global ACL
 # inbetween them, so that we can store data separately for
 # each User and each Tenant it belongs
 class Profile(models.Model):        # No applied, as this is global ACL
-    user = models.ForeignKey('User', related_name='user', related_query_name='user', on_delete=models.CASCADE)
-    tenant = models.ForeignKey('Tenant', related_name='tenant', related_query_name='tenant', on_delete=models.CASCADE)
+    user = models.ForeignKey('User', related_name='users', related_query_name='users', on_delete=models.CASCADE)
+    tenant = models.ForeignKey('Tenant', related_name='members', related_query_name='members', on_delete=models.CASCADE)
 
     username = models.CharField(max_length=64, null=False, blank=False)
     role = models.CharField(max_length=64, null=True, blank=True)
@@ -49,3 +49,4 @@ class Tenant(models.Model):         # No applied, as this is global ACL
     creation_date = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
 
+    # TODO: add field and logic to control public/private tenant and show only public tenants in tenant list api.

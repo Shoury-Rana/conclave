@@ -1,23 +1,25 @@
+from django.contrib.admin.utils import lookup_field
 from django.contrib.auth import authenticate
+from django.db.migrations import serializer
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework.generics import RetrieveAPIView, UpdateAPIView, RetrieveUpdateAPIView, ListCreateAPIView
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.generics import RetrieveAPIView, RetrieveUpdateAPIView, ListCreateAPIView, get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.utils.representation import serializer_repr
 from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.contexts import get_current_tenant_id
+from core.permissions import IsCreator
 from core.models import (
     User, Tenant, Profile
 )
-from core.permissions import IsCreator
 from core.serializers import (
     SignupSerializer, LoginSerializer, UserProfileSerializer,
-    ListCreateTenantSerializer
+    ListCreateTenantSerializer, TenantDetailSerializer, TenantSettingSerializer
 )
+
 
 @extend_schema(request=SignupSerializer)
 class SignupView(APIView):
@@ -61,10 +63,11 @@ class LoginView(APIView):
 
 
 class UserProfileView(RetrieveUpdateAPIView):
-    permission_classes = [IsAuthenticated, IsCreator]
+    permission_classes = [IsAuthenticated]
     serializer_class = UserProfileSerializer
     lookup_field = 'name'
     queryset = User.objects.all()
+
 
 
 @extend_schema(request=ListCreateTenantSerializer)
@@ -72,3 +75,37 @@ class ListCreateTenantView(ListCreateAPIView):
     serializer_class = ListCreateTenantSerializer
     permission_classes = [IsAuthenticated]
     queryset = Tenant.objects.all()
+
+
+@extend_schema(operation_id="tenant_detail_view", responses=TenantDetailSerializer)
+class TenantDetailView(RetrieveAPIView):
+    queryset = Tenant.objects.all()
+    serializer_class = TenantDetailSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        user = self.request.user
+        tenant_id = get_current_tenant_id()
+        tenant = get_object_or_404(self.queryset, pk=tenant_id)
+
+        if Profile.objects.filter(user=user, tenant=tenant_id).exists() or tenant.created_by == user:
+            return tenant
+        raise PermissionDenied("User not member of tenant.")
+
+@extend_schema(request=TenantSettingSerializer)
+class TenantSettingView(RetrieveUpdateAPIView):
+    queryset = Tenant.objects.all()
+    serializer_class = TenantSettingSerializer
+    permission_classes = [IsAuthenticated, IsCreator]
+
+    def get_object(self):
+        tenant_id = get_current_tenant_id()
+        tenant = get_object_or_404(self.queryset, pk=tenant_id)
+        return tenant
+
+    def update(self, request, *args, **kwargs):
+        obj = self.get_object()
+        serializer = self.get_serializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
