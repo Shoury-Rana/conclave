@@ -5,9 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "channels>=4.3.2",
+    "channels-redis>=4.3.0",
     "dj-config-url>=0.1.1",
     "dj-database-url>=3.1.2",
     "django>=6.0.6",
+    "django-redis>=7.0.0",
     "djangorestframework>=3.17.1",
     "djangorestframework-simplejwt>=5.5.1",
     "djangorestframework-stubs>=3.17.0",
@@ -16,4 +19,5 @@ dependencies = [
     "pathspec>=1.1.1",
     "psycopg>=3.3.4",
     "python-dotenv>=1.2.2",
+    "uvicorn[standard]>=0.49.0",
 ]

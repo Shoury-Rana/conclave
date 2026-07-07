@@ -33,12 +33,13 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
 
     # Apps
-    'core'
+    'core',
+    'chats'
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'core.middlewares.SubDomainMiddleware',
+    'core.middleware.SubDomainMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -119,3 +120,25 @@ STATIC_URL = 'static/'
 AUTH_USER_MODEL = 'core.User'
 
 BASE_DOMAIN_LENGTH = os.environ.get('BASE_DOMAIN_LENGTH')
+
+REDIS_HOST = os.environ.get('REDIS_HOST')
+REDIS_PORT = os.environ.get('REDIS_PORT')
+
+
+CACHES ={
+    "default": {
+        'BACKEND': 'django_redis.cache.RedisCache',     # Not using django native redis backend as it lacks data structures like HSET or ZSET etc.
+        'LOCATION': f'redis://{REDIS_HOST}:{REDIS_PORT}/1'
+    }
+}
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [f'redis://{REDIS_HOST}:{REDIS_PORT}/0']
+        }
+    }
+}
+
+ASGI_APPLICATION = 'Conclave.asgi.application'
