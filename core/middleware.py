@@ -61,7 +61,7 @@ class SubDomainMiddleware:
             try:
                 with transaction.atomic():
                     with connection.cursor() as cursor:
-                        cursor.execute(f"SET LOCAL app.current_tenant = '{tenant.id}';")
+                        cursor.execute("SELECT set_config('app.current_tenant', %s, true);", [str(tenant.id)])
                     return self.get_response(request)
             finally:
                 _current_tenant_id.reset(token)

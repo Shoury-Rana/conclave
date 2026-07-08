@@ -22,7 +22,7 @@ class RoomMembers(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     room = models.ForeignKey('ChatRooms', related_name='room', on_delete=models.CASCADE)
     profile = models.ForeignKey('core.Profile', related_name='profile', on_delete=models.CASCADE)
-    last_read_message = models.ForeignKey('Messages', related_name='last_read', on_delete=models.CASCADE)
+    last_read_message = models.ForeignKey('Messages', related_name='last_read', on_delete=models.CASCADE, null=True, blank=True)
     joined_at = models.DateTimeField(auto_now=True)
 
     class Meta:

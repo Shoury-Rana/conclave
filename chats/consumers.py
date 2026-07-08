@@ -1,14 +1,13 @@
 import json
 
 from asgiref.sync import sync_to_async
-from channels.db import database_sync_to_async
+from chats.utilts import rls_db_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from django.core.mail import message
 from django_redis import get_redis_connection
-
+from chats.models import Messages
 from chats.models import ChatRooms
 
-redis_conn = get_redis_connection()     # instead of this, redis-py's native aioredis should be used.
+redis_conn = get_redis_connection()     # TODO: instead of this, redis-py's native aioredis should be used.
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -20,7 +19,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
-        self.chat_room = await database_sync_to_async(ChatRooms.objects.filter(name=self.room_name).first)()
+        self.chat_room = await rls_db_sync_to_async(ChatRooms.objects.filter(name=self.room_name).first)()
         if not self.chat_room:       # No need to check for tenant specific as it will be handled via RLS
             await self.close()
             return
@@ -47,16 +46,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
         text_data_json = json.loads(text_data or '')
         message = text_data_json.get('message', None)
         message_type = text_data_json.get('type', None)
+        sender = text_data_json.get('sender', None)
 
         match message_type:
             case 'message_send':
-                event_type = 'message.send'
-
+                self.event_type = 'message.send'
+            case _:
+                return
 
         await self.channel_layer.group_send(self.room_name, {
-            'type': event_type,
-            'message': message
+            'type': self.event_type,
+            'message': message,
+            'sender': sender,
         })
+        rls_db_sync_to_async(Messages.objects.create)(room=self.room_name, sender=sender, content=message)
 
     async def message_send(self, event):
         await self.send(json.dumps({

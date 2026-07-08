@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv()
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
-DEBUG = bool(os.environ.get('DEBUG'))
+DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 ALLOWED_HOSTS = str(os.environ.get('ALLOWED_HOSTS')).split(',')
 
 INSTALLED_APPS = [
@@ -39,6 +39,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     'core.middleware.SubDomainMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
