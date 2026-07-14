@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # Dependencies
+    'corsheaders',
     'drf_spectacular',
     'rest_framework',
     'rest_framework_simplejwt',
@@ -39,7 +40,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'corsheaders.middleware.CorsMiddleware'
     'core.middleware.SubDomainMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -143,3 +145,5 @@ CHANNEL_LAYERS = {
 }
 
 ASGI_APPLICATION = 'Conclave.asgi.application'
+
+CORS_ALLOWED_ORIGINS = str(os.environ.get('CORS_ALLOWED_ORIGINS')).split(',')
