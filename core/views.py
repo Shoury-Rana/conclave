@@ -4,12 +4,12 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.generics import (
-    RetrieveUpdateAPIView,
-    ListCreateAPIView,
     ListAPIView,
+    ListCreateAPIView,
+    RetrieveUpdateAPIView,
     get_object_or_404,
 )
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -17,20 +17,20 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from chats.choices import RoomTypes
 from chats.models import ChatRooms, RoomMembers
 from core.contexts import get_current_tenant_id
-from core.models import User, Tenant, Profile, TenantInvitation, TenantJoinRequest
+from core.models import Profile, Tenant, TenantInvitation, TenantJoinRequest, User
 from core.permissions import IsCreator, IsTenantMember
 from core.serializers import (
-    SignupSerializer,
-    LoginSerializer,
-    MeSerializer,
-    UserProfileSerializer,
-    TenantSerializer,
     ListCreateTenantSerializer,
-    TenantDetailSerializer,
-    TenantSettingSerializer,
+    LoginSerializer,
     MemberSerializer,
+    MeSerializer,
+    SignupSerializer,
+    TenantDetailSerializer,
     TenantInvitationSerializer,
     TenantJoinRequestSerializer,
+    TenantSerializer,
+    TenantSettingSerializer,
+    UserProfileSerializer,
 )
 
 

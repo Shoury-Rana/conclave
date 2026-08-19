@@ -1,11 +1,11 @@
 import re
 
 from django.conf import settings
-from django.db import transaction, connection
+from django.db import connection, transaction
 from django.http import Http404, JsonResponse
 
-from core.models import Tenant
 from core.contexts import _current_tenant_id
+from core.models import Tenant
 
 
 class SubDomainMiddleware:

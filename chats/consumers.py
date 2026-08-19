@@ -4,7 +4,7 @@ from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django_redis import get_redis_connection
 
-from chats.models import Messages, ChatRooms, RoomMembers
+from chats.models import ChatRooms, Messages, RoomMembers
 from chats.utils import rls_db_sync_to_async
 from core.models import Profile
 

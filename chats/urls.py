@@ -1,7 +1,8 @@
 from django.urls import path
+
 from chats.views import (
-    ChatRoomListCreateView,
     ChatRoomJoinView,
+    ChatRoomListCreateView,
     ChatRoomMessageListView,
     ChatRoomReadStateView,
     DirectMessageRoomView,

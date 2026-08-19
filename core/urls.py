@@ -1,21 +1,22 @@
 from django.urls import path
+
 from core.views import (
-    SignupView,
+    InviteMemberView,
+    JoinTenantView,
+    ListCreateTenantView,
     LoginView,
     MeView,
-    UserProfileView,
-    ListCreateTenantView,
     MyTenantsListView,
+    RespondInvitationView,
+    RespondJoinRequestView,
     SearchTenantsView,
-    JoinTenantView,
+    SignupView,
     TenantDetailView,
     TenantSettingView,
-    WorkspaceMembersListView,
-    InviteMemberView,
     UserInvitationsListView,
-    RespondInvitationView,
+    UserProfileView,
     WorkspaceJoinRequestsView,
-    RespondJoinRequestView,
+    WorkspaceMembersListView,
 )
 
 urlpatterns = [

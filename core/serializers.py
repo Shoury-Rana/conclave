@@ -1,6 +1,7 @@
-from rest_framework import serializers
 from django_redis import get_redis_connection
-from core.models import User, Tenant, Profile, TenantInvitation, TenantJoinRequest
+from rest_framework import serializers
+
+from core.models import Profile, Tenant, TenantInvitation, TenantJoinRequest, User
 
 
 class SignupSerializer(serializers.Serializer):

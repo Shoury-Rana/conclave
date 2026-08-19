@@ -7,10 +7,10 @@ django_asgi_app = (
     get_asgi_application()
 )  # Must be initialized first so that django can set up before calling apps.
 
-from chats.middleware import WebSocketScopeMiddleware
 from channels.routing import ProtocolTypeRouter, URLRouter
-from chats import routing
 
+from chats import routing
+from chats.middleware import WebSocketScopeMiddleware
 
 application = ProtocolTypeRouter(
     {

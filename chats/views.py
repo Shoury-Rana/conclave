@@ -3,7 +3,7 @@ from datetime import datetime
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import NotFound
-from rest_framework.generics import ListCreateAPIView, ListAPIView
+from rest_framework.generics import ListAPIView, ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -16,7 +16,7 @@ from chats.serializers import (
     MessageSerializer,
 )
 from core.contexts import get_current_tenant_id
-from core.models import Tenant, Profile, User
+from core.models import Profile, Tenant, User
 from core.permissions import IsTenantMember
 
 

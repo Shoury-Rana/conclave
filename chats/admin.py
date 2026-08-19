@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from chats.models import ChatRooms, RoomMembers, Messages
+from chats.models import ChatRooms, Messages, RoomMembers
 
 
 # Register your models here.

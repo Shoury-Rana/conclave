@@ -1,6 +1,6 @@
 from rest_framework import serializers
+
 from chats.models import ChatRooms, Messages, RoomMembers
-from core.models import Profile
 
 
 class MessageSerializer(serializers.ModelSerializer):
