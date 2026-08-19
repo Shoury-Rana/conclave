@@ -5,20 +5,32 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('chats', '0001_initial'),
+        ("chats", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='chatrooms',
-            name='type',
-            field=models.CharField(choices=[('DIRECT_MESSAGE', 'Direct Message'), ('TENANT_CHATS', 'Tenant Chats'), ('BROADCAST', 'Broadcast')], default='BROADCAST'),
+            model_name="chatrooms",
+            name="type",
+            field=models.CharField(
+                choices=[
+                    ("DIRECT_MESSAGE", "Direct Message"),
+                    ("TENANT_CHATS", "Tenant Chats"),
+                    ("BROADCAST", "Broadcast"),
+                ],
+                default="BROADCAST",
+            ),
         ),
         migrations.AlterField(
-            model_name='roommembers',
-            name='last_read_message',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='last_read', to='chats.messages'),
+            model_name="roommembers",
+            name="last_read_message",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="last_read",
+                to="chats.messages",
+            ),
         ),
     ]

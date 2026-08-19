@@ -8,5 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
-
 .env
+
+.idea/
+
+flatten_exclude.py
+repo_combined_output.txt

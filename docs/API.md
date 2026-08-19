@@ -1,203 +1,175 @@
-###### Endpoint list
-###### Request examples
-###### Response examples
-###### Authentication methods
-###### Error codes
+# Conclave API Reference
+
+## 1. Authentication & Identity (Root Domain)
+
+### `POST /auth/signup/`
+Registers a new user and returns JWT tokens.
+- **Request Body:**
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "securepassword",
+    "name": "Alex"
+  }
+  ```
+- **Response (201 Created):**
+  ```json
+  {
+    "user": {
+      "id": "uuid",
+      "email": "user@example.com",
+      "name": "Alex"
+    },
+    "access_token": "jwt...",
+    "refresh_token": "jwt..."
+  }
+  ```
+
+### `POST /auth/login/`
+Authenticates an existing user.
+- **Request Body:**
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "securepassword"
+  }
+  ```
+
+### `POST /auth/token/refresh/`
+Refreshes an expired access token.
+- **Request Body:**
+  ```json
+  {
+    "refresh": "jwt..."
+  }
+  ```
+
+### `GET /auth/me/` (or `GET /profile/me/`)
+Returns the authenticated user's profile and workspaces.
 
 ---
 
---- 
-# AUTH
+## 2. Workspace Management (Root Domain)
 
----
-### POST `{{BASE_URL}}/auth/signup/`
-- Used for signing up.
-- Request:
-  ```
-  - email
-  - password
-  - username
-  ```
-- Response:
-  ```
-  - refresh token
-  - access token
-  ```
-  
----
-### POST `{{BASE_URL}}/auth/login/`
-- Used for login.
-- Request:
-  ```
-  - email
-  - password
-  ```
-- Response:
-  ```
-  - refresh token
-  - access token
+### `GET /tenant/mine/`
+List all workspaces the authenticated user belongs to or owns.
+
+### `GET /tenant/search/?q=tech`
+Search public workspaces.
+
+### `POST /tenant/`
+Create a new workspace.
+- **Request Body:**
+  ```json
+  {
+    "name": "acme",
+    "is_public": true
+  }
   ```
 
----
-### GET/PUT/PATCH `{{BASE_URL}}/profile/<user_id>/`
-- Details about the user.
-- Additionally, let user update their own profile.
-- Request:
-  ```
-  - 
-  ```
-- Response:
-  ```
-  - 
-  ```
-
----
-
----
-# LANDING PAGE (Ignore as will be managed via vercel instead of render)
-
----
-### GET `{{BASE_URL}}/` - '.app'
-- React based landing page about conclave.
-- Responses with React page.
-- Deployed on vercel, and not on render to overcome at least coldstart problem on frontend.
-- Basically ignore this here.
-
----
-
----
-# TENANT OPERATIONS FROM HOMEPAGE (i.e., with no subdomain)
-
----
-### GET `{{BASE_URL}}/tenant/`
-- Returns list of all available tenants.
-- Response:
-  ```
-  - 
-  ```
-  
----
-### POST `{{BASE_URL}}/tenant/`
-- Let user create a new tenant.
-- Request:
-  ```
-  -
-  ```
-- Response:
-  ```
-  - 
-  ```
-  
----
-
----
-# TENANT SPECIFIC OPERATIONS (i.e., with subdomain)
-
----
-### GET `*.{{BASE_URL}}/`
-- Details for specified tenant.
-- Response:
-  ```
-  - 
-  ```
-  
----
-### PUT/PATCH `*.{{BASE_URL}}/settings/`
-- See/Update specified tenant.
-- Only if it is user who created tenant.
-- Request:
-  ```
-  - 
-  ```
-- Response:
-  ```
-  - 
+### `POST /tenant/join/`
+Join a public workspace or submit a request to a private workspace.
+- **Request Body:**
+  ```json
+  {
+    "tenant_name": "acme"
+  }
   ```
 
 ---
 
----
-# INVITES/REQUESTS SYSTEM
+## 3. Workspace Operations (Subdomain Scoped: `acme.conclave.app`)
+
+### `GET /`
+Workspace overview, member count, and room count.
+
+### `GET /members/`
+List workspace members with realtime `is_online` status indicators.
+
+### `POST /invite/`
+Invite a user by email to the current workspace.
+
+### `GET /chats/rooms/`
+List all chat channels and direct messages in the current workspace.
+
+### `POST /chats/rooms/`
+Create a new chat room/channel.
+- **Request Body:**
+  ```json
+  {
+    "name": "engineering",
+    "type": "TENANT_CHATS"
+  }
+  ```
+
+### `POST /chats/dm/<uuid:target_user_id>/`
+Get or create a 1-on-1 Direct Message room.
+
+### `GET /chats/rooms/<uuid:room_id>/messages/?limit=50&before=2026-08-16T12:00:00Z`
+Fetch chronological message history for terminal viewports with cursor pagination.
+
+### `GET /chats/rooms/<uuid:room_id>/read-states/`
+Get unread badge count and last read message ID.
 
 ---
-### POST `*.{{BASE_URL}}/invite/`
-- Invite user to specific tenant.
-- Only if it is user who created tenant.
-- Request:
-  ```
-  - 
-  ```
-- Response:
-  ```
-  - 
-  ```
-  
----
-### GET `*.{{BASE_URL}}/invitations/`
-- List of invited users to that specific tenant.
-- Only if it is user who created tenant.
-- Request:
-  ```
-  - 
-  ```
-- Response:
-  ```
-  - 
-  ```
-  
----
-### POST `*.{{BASE_URL}}/invitations/{id}/`
-- Accept/Reject invitation.
-- Tenant owner only.
-- Request:
-  ```
-  - 
-  ```
-- Response:
-  ```
-  - 
-  ```
-  
----
-### POST `*.{{BASE_URL}}/request/`
-- Send request to join specific tenant.
-- Request:
-  ```
-  - 
-  ```
-- Response:
-  ```
-  - 
-  ```
-  
----
-### GET `*.{{BASE_URL}}/requested/`
-- List of tenants to whom join request is sent.
-- Response:
-  ```
-  - 
-  ```
-  
----
-### GET `*.{{BASE_URL}}/requests/`
-- List of users who have sent request to join tenants.
-- Tenant owner only.
-- Response:
-  ```
-  - 
-  ```
-  
----
-### POST `*.{{BASE_URL}}/requests/{id}/`
-- Accept/Reject request.
-- Tenant owner only.
-- Request:
-  ```
-  - 
-  ```
-- Response:
-  ```
-  - 
-  ```
-  
----
+
+## 4. WebSocket Streaming Protocol
+
+**Connection URL:**
+`ws://acme.conclave.app/ws/chat/?token=<JWT_ACCESS_TOKEN>&room_id=<ROOM_UUID>`
+
+### Client to Server Payloads:
+
+1. **Send Message:**
+   ```json
+   {
+     "type": "message_send",
+     "message": "Hello from the TUI!"
+   }
+   ```
+2. **Mark Message as Read:**
+   ```json
+   {
+     "type": "mark_read",
+     "message_id": "message-uuid"
+   }
+   ```
+3. **Typing Indicator:**
+   ```json
+   { "type": "typing_start" }
+   { "type": "typing_stop" }
+   ```
+
+### Server to Client Events:
+
+1. **New Message:**
+   ```json
+   {
+     "type": "message_send",
+     "id": "uuid",
+     "room_id": "uuid",
+     "sender_id": "uuid",
+     "sender_name": "Alex",
+     "sender_username": "alex",
+     "content": "Hello from the TUI!",
+     "sent_at": "2026-08-16T12:00:00Z"
+   }
+   ```
+2. **User Presence:**
+   ```json
+   {
+     "type": "presence",
+     "user_id": "uuid",
+     "user_name": "Alex",
+     "status": "online"
+   }
+   ```
+3. **Typing Event:**
+   ```json
+   {
+     "type": "typing",
+     "user_id": "uuid",
+     "user_name": "Alex",
+     "typing": true
+   }
+   ```

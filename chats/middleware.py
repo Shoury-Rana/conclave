@@ -1,31 +1,56 @@
+import urllib.parse
+
 from asgiref.sync import sync_to_async
+from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
+from django.conf import settings
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from django.conf import settings
+
 from core.contexts import _current_tenant_id
 from core.models import Tenant
-from channels.db import database_sync_to_async
 
 
 class WebSocketScopeMiddleware(BaseMiddleware):
+    """
+    Authenticates WebSocket connections using JWT tokens passed via
+    query string, Authorization header, or sec-websocket-protocol.
+    Resolves tenant context and requested room identifiers.
+    """
+
     async def __call__(self, scope, receive, send):
-        headers = dict(scope.get('headers', {}))
+        headers = dict(scope.get("headers", {}))
+        query_string = scope.get("query_string", b"").decode("utf-8")
+        query_params = urllib.parse.parse_qs(query_string)
 
-        tenant_token = await self.process_http_headers(headers)
-        subprotocol = headers.get(b'sec-websocket-protocol', b'').decode('utf-8')
+        token = None
+        if "token" in query_params:
+            token = query_params["token"][0]
+        elif b"authorization" in headers:
+            auth_header = headers[b"authorization"].decode("utf-8")
+            if auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
 
+        subprotocol = headers.get(b"sec-websocket-protocol", b"").decode("utf-8")
         if subprotocol:
-            protocol = [p.strip() for p in subprotocol.split(',')]
+            protocols = [p.strip() for p in subprotocol.split(",")]
+            for p in protocols:
+                if p.startswith("access_token:"):
+                    token = p.split("access_token:")[1]
+                elif p.startswith("room_id:"):
+                    scope["room_id"] = p.split("room_id:")[1]
+                elif p.startswith("room_name:"):
+                    scope["room_name"] = p.split("room_name:")[1]
 
-            access_token = (at := next((at for at in protocol if at.startswith('access_token')), None)) and at.split(':')[1]
-            user = await self.is_valid_user(access_token)
-            if access_token and user is not None:
-                scope['user'] = user
+        if "room_id" in query_params:
+            scope["room_id"] = query_params["room_id"][0]
+        if "room_name" in query_params:
+            scope["room_name"] = query_params["room_name"][0]
 
-            room_name = (rn:= next((rn for rn in protocol if rn.startswith('room_name')), None)) and rn.split(':')[1]
-            if room_name:
-                scope['room_name'] = room_name
+        if token:
+            scope["user"] = await self.is_valid_user(token)
+
+        tenant_token = await self.process_tenant(headers, query_params)
 
         if tenant_token:
             try:
@@ -39,25 +64,32 @@ class WebSocketScopeMiddleware(BaseMiddleware):
         authenticator = JWTAuthentication()
 
         try:
-            validated_token = await sync_to_async(authenticator.get_validated_token)(access_token)
+            validated_token = await sync_to_async(authenticator.get_validated_token)(
+                access_token
+            )
             user = await sync_to_async(authenticator.get_user)(validated_token)
             return user
-        except (InvalidToken, TokenError):
+        except InvalidToken, TokenError, Exception:
             return None
 
-    async def process_http_headers(self, headers):
+    async def process_tenant(self, headers, query_params):
+        host = headers.get(b"host", b"").decode("utf-8")
+        host_parts = host.split(":")[0].split(".")
+        base_domain_length = int(getattr(settings, "BASE_DOMAIN_LENGTH", 2))
 
-        host = headers.get(b'host', b'').decode('utf-8')
-        host_parts = host.split(':')[0].split('.')
-        base_domain_length = int(settings.BASE_DOMAIN_LENGTH)
-
+        tenant = None
         if len(host_parts) == base_domain_length + 1:
             subdomain = host_parts[0]
-            tenant = await database_sync_to_async(Tenant.objects.filter(name__iexact=subdomain).first)()
+            tenant = await database_sync_to_async(
+                Tenant.objects.filter(name__iexact=subdomain).first
+            )()
 
-            if tenant:
-                tenant_id = tenant.id
-                token = _current_tenant_id.set(tenant_id)
-                return token
-        else:
-            return None
+        if not tenant and "tenant" in query_params:
+            tenant_param = query_params["tenant"][0]
+            tenant = await database_sync_to_async(
+                Tenant.objects.filter(name__iexact=tenant_param).first
+            )()
+
+        if tenant:
+            return _current_tenant_id.set(tenant.id)
+        return None
