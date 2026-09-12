@@ -1,5 +1,3 @@
-# Note: This is AI-generated based on models.py
-
 # Database Design
 
 ## Database Technology
@@ -144,6 +142,17 @@ Examples:
 * The same username may exist across different tenants.
 * Roles are scoped to a tenant.
 * Tags are tenant-specific.
+
+---
+
+### RoomMembers
+Purpose: Connects a profile to a specific chat room while handling read-state activity logic.
+
+#### Key Fields
+* `room`
+* `profile`
+* `last_read_at` (DateTimeField updated when a user views a message)
+* `joined_at`
 
 ---
 

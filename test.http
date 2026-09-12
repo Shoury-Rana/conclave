@@ -1,0 +1,250 @@
+### ==========================================
+### PHASE 1: GLOBAL OPS (ROOT DOMAIN)
+### ==========================================
+
+### 1. Register Admin User
+POST http://{{host}}/auth/signup/
+Content-Type: application/json
+
+{
+  "email": "admin@conclave.local",
+  "name": "System Admin",
+  "password": "SecurePassword123!"
+}
+
+> {%
+    client.test("Successful Signup", function() {
+        client.assert(response.status === 201 || response.status === 400, "Signup attempted");
+    });
+    if (response.status === 201) {
+        client.global.set("access_token", response.body.access_token);
+        client.global.set("refresh_token", response.body.refresh_token);
+    }
+%}
+
+### 2. Login Admin User (If already registered)
+POST http://{{host}}/auth/login/
+Content-Type: application/json
+
+{
+  "email": "admin@conclave.local",
+  "password": "SecurePassword123!"
+}
+
+> {%
+    client.test("Successful Login", function() {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+    client.global.set("access_token", response.body.access_token);
+    client.global.set("refresh_token", response.body.refresh_token);
+%}
+
+### 3. Get My Global Profile
+GET http://{{host}}/auth/me/
+Authorization: Bearer {{access_token}}
+
+### 4. Create a Workspace (Tenant)
+POST http://{{host}}/tenant/
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "name": "{{tenant_name}}",
+  "is_public": true
+}
+
+> {%
+    client.test("Workspace created or exists", function() {
+        client.assert(response.status === 201 || response.status === 400, "Created or already exists");
+    });
+%}
+
+### 5. Search Public Workspaces
+GET http://{{host}}/tenant/search/?q={{tenant_name}}
+Authorization: Bearer {{access_token}}
+
+### 6. List My Workspaces
+GET http://{{host}}/tenant/mine/
+Authorization: Bearer {{access_token}}
+
+
+### ==========================================
+### PHASE 2: ONBOARD SECOND USER (FOR DM / INTERACTION)
+### ==========================================
+
+### 7. Register Second User (Alex Member)
+POST http://{{host}}/auth/signup/
+Content-Type: application/json
+
+{
+  "email": "alex@conclave.local",
+  "name": "Alex Member",
+  "password": "SecurePassword123!"
+}
+
+> {%
+    if (response.status === 201) {
+        client.global.set("user2_access_token", response.body.access_token);
+        client.global.set("user2_id", response.body.user.id);
+    }
+%}
+
+### 8. Login Second User (If already registered)
+POST http://{{host}}/auth/login/
+Content-Type: application/json
+
+{
+  "email": "alex@conclave.local",
+  "password": "SecurePassword123!"
+}
+
+> {%
+    if (response.status === 200) {
+        client.global.set("user2_access_token", response.body.access_token);
+        client.global.set("user2_id", response.body.user.id);
+    }
+%}
+
+### 9. Second User Joins Workspace
+POST http://{{host}}/tenant/join/
+Authorization: Bearer {{user2_access_token}}
+Content-Type: application/json
+
+{
+  "tenant_name": "{{tenant_name}}"
+}
+
+
+### ==========================================
+### PHASE 3: WORKSPACE OPS (SUBDOMAIN)
+### ==========================================
+
+### 10. Get Workspace Overview
+GET http://{{tenant_name}}.{{host}}/
+Authorization: Bearer {{access_token}}
+
+### 11. List Workspace Members (Capture Alex's user_id for DM)
+GET http://{{tenant_name}}.{{host}}/members/
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("Members list contains members", function() {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+    for (let i = 0; i < response.body.length; i++) {
+        if (response.body[i].email === "alex@conclave.local") {
+            client.global.set("target_user_id", response.body[i].user_id);
+            break;
+        }
+    }
+    if (!client.global.get("target_user_id") && response.body.length > 1) {
+        client.global.set("target_user_id", response.body[1].user_id);
+    }
+%}
+
+
+### ==========================================
+### PHASE 4: CHAT REST OPERATIONS (SUBDOMAIN)
+### ==========================================
+
+### 12. Create a Channel Room (#engineering)
+POST http://{{tenant_name}}.{{host}}/chats/rooms/
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "name": "engineering",
+  "type": "TENANT_CHATS"
+}
+
+> {%
+    if (response.status === 201) {
+        client.global.set("room_id", response.body.id);
+    }
+%}
+
+### 13. List All Chat Rooms
+GET http://{{tenant_name}}.{{host}}/chats/rooms/
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("Rooms exist", function() {
+        client.assert(response.status === 200, "Expected 200 OK");
+        if (!client.global.get("room_id") && response.body.length > 0) {
+            client.global.set("room_id", response.body[0].id);
+        }
+    });
+%}
+
+### 14. Create or Retrieve Direct Message Room with Second User
+POST http://{{tenant_name}}.{{host}}/chats/dm/{{target_user_id}}/
+Authorization: Bearer {{access_token}}
+
+### 15. Get Room Messages (Cursor Pagination)
+GET http://{{tenant_name}}.{{host}}/chats/rooms/{{room_id}}/messages/?limit=50
+Authorization: Bearer {{access_token}}
+
+### 16. Get Room Read States
+GET http://{{tenant_name}}.{{host}}/chats/rooms/{{room_id}}/read-states/
+Authorization: Bearer {{access_token}}
+
+
+### ==========================================
+### PHASE 5: REALTIME WEBSOCKET OPS
+### ==========================================
+
+### 17. Connect to Default Room (#general)
+WEBSOCKET ws://{{tenant_name}}.{{host}}/ws/chat/?token={{access_token}}
+Content-Type: application/json
+
+===
+{
+  "type": "message_send",
+  "message": "Hello from PyCharm WebSocket Test!"
+}
+=== wait-for-server
+{
+  "type": "typing_start"
+}
+===
+{
+  "type": "typing_stop"
+}
+
+### 18. Connect to Specific Room (#engineering / DM)
+WEBSOCKET ws://{{tenant_name}}.{{host}}/ws/chat/{{room_id}}/?token={{access_token}}
+Content-Type: application/json
+
+===
+{
+  "type": "message_send",
+  "message": "Realtime message sent directly to channel room!"
+}
+
+
+### ==========================================
+### PHASE 6: AUTH REFRESH & SETTINGS
+### ==========================================
+
+### 19. Refresh Access Token
+POST http://{{host}}/auth/token/refresh/
+Content-Type: application/json
+
+{
+  "refresh": "{{refresh_token}}"
+}
+
+> {%
+    if (response.status === 200) {
+        client.global.set("access_token", response.body.access);
+    }
+%}
+
+### 20. Update Workspace Settings (Owner Only)
+PATCH http://{{tenant_name}}.{{host}}/setting/
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "is_public": true
+}
