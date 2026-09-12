@@ -16,7 +16,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from chats.choices import RoomTypes
 from chats.models import ChatRooms, RoomMembers
-from core.contexts import get_current_tenant_id
+from core.contexts import get_current_tenant_id, tenant_rls_transaction
 from core.models import Profile, Tenant, TenantInvitation, TenantJoinRequest, User
 from core.permissions import IsCreator, IsTenantMember
 from core.serializers import (
@@ -74,7 +74,10 @@ class LoginView(APIView):
         email = serializer.validated_data["email"].lower()
         password = serializer.validated_data["password"]
 
-        user = authenticate(request, email=email, password=password)
+        user = authenticate(request, username=email, password=password)
+        if not user:
+            user = authenticate(request, email=email, password=password)
+
         if not user:
             return Response(
                 {"error": "Invalid email or password."},
@@ -112,6 +115,11 @@ class UserProfileView(RetrieveUpdateAPIView):
             return self.request.user
         return get_object_or_404(User, pk=pk)
 
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method in ["PUT", "PATCH"] and obj != request.user:
+            raise PermissionDenied("You can only update your own profile.")
+
 
 @extend_schema(request=ListCreateTenantSerializer, responses=TenantSerializer)
 class ListCreateTenantView(ListCreateAPIView):
@@ -121,19 +129,21 @@ class ListCreateTenantView(ListCreateAPIView):
 
     def perform_create(self, serializer):
         tenant = serializer.save(created_by=self.request.user)
-        profile, _ = Profile.objects.get_or_create(
-            user=self.request.user,
-            tenant=tenant,
-            defaults={
-                "username": self.request.user.name.lower().replace(" ", "_")
-                or self.request.user.email.split("@")[0],
-                "role": "owner",
-            },
-        )
-        general_room, _ = ChatRooms.objects.get_or_create(
-            tenant=tenant, name="general", defaults={"type": RoomTypes.TENANT_CHATS}
-        )
-        RoomMembers.objects.get_or_create(room=general_room, profile=profile)
+        base_username = (
+            self.request.user.name.lower().replace(" ", "_")
+            or self.request.user.email.split("@")[0]
+        )[:50]
+
+        with tenant_rls_transaction(tenant.id):
+            profile, _ = Profile.objects.get_or_create(
+                user=self.request.user,
+                tenant=tenant,
+                defaults={"username": base_username, "role": "owner"},
+            )
+            general_room, _ = ChatRooms.objects.get_or_create(
+                tenant=tenant, name="general", defaults={"type": RoomTypes.TENANT_CHATS}
+            )
+            RoomMembers.objects.get_or_create(room=general_room, profile=profile)
 
 
 class MyTenantsListView(ListAPIView):
@@ -183,25 +193,29 @@ class JoinTenantView(APIView):
             )
 
         if tenant.is_public:
-            username = (
+            base_username = (
                 request.data.get("username")
                 or request.user.name.lower().replace(" ", "_")
                 or request.user.email.split("@")[0]
-            )
-            base_username = username
+            )[:50]
+
+            username = base_username
             counter = 1
             while Profile.objects.filter(tenant=tenant, username=username).exists():
-                username = f"{base_username}_{counter}"
+                username = f"{base_username[:45]}_{counter}"
                 counter += 1
 
-            profile = Profile.objects.create(
-                user=request.user, tenant=tenant, username=username, role="member"
-            )
-            general_room = ChatRooms.objects.filter(
-                tenant=tenant, name="general"
-            ).first()
-            if general_room:
-                RoomMembers.objects.get_or_create(room=general_room, profile=profile)
+            with tenant_rls_transaction(tenant.id):
+                profile = Profile.objects.create(
+                    user=request.user, tenant=tenant, username=username, role="member"
+                )
+                general_room = ChatRooms.objects.filter(
+                    tenant=tenant, name="general"
+                ).first()
+                if general_room:
+                    RoomMembers.objects.get_or_create(
+                        room=general_room, profile=profile
+                    )
 
             return Response(
                 {
@@ -211,7 +225,7 @@ class JoinTenantView(APIView):
                 status=status.HTTP_201_CREATED,
             )
         else:
-            join_req, created = TenantJoinRequest.objects.get_or_create(
+            join_req, _ = TenantJoinRequest.objects.get_or_create(
                 tenant=tenant,
                 user=request.user,
                 defaults={"status": TenantJoinRequest.Status.PENDING},
@@ -233,15 +247,19 @@ class TenantDetailView(APIView):
         tenant_id = get_current_tenant_id()
         if not tenant_id:
             return Response(
-                {"error": "No workspace context in request."},
-                status=status.HTTP_400_BAD_REQUEST,
+                {
+                    "name": "Conclave Chat API",
+                    "version": "1.0.0",
+                    "detail": "Root domain API. Use subdomain (e.g. acme.lvh.me:8000) or 'X-Tenant' header to access workspace.",
+                },
+                status=status.HTTP_200_OK,
             )
 
         tenant = get_object_or_404(Tenant, pk=tenant_id)
-        if (
-            not Profile.objects.filter(user=request.user, tenant=tenant).exists()
-            and tenant.created_by != request.user
-        ):
+        is_member = Profile.objects.filter(user=request.user, tenant=tenant).exists()
+        is_creator = tenant.created_by == request.user
+
+        if not (is_member or is_creator):
             raise PermissionDenied("You are not a member of this workspace.")
 
         serializer = TenantDetailSerializer(tenant)
@@ -292,7 +310,7 @@ class InviteMemberView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        invitation, created = TenantInvitation.objects.get_or_create(
+        invitation, _ = TenantInvitation.objects.get_or_create(
             tenant=tenant,
             invited_user=target_user,
             defaults={
@@ -328,34 +346,36 @@ class RespondInvitationView(APIView):
             invitation.status = TenantInvitation.Status.ACCEPTED
             invitation.save()
 
-            username = (
+            base_username = (
                 request.user.name.lower().replace(" ", "_")
                 or request.user.email.split("@")[0]
-            )
-            base_username = username
+            )[:50]
+            username = base_username
             counter = 1
             while Profile.objects.filter(
                 tenant=invitation.tenant, username=username
             ).exists():
-                username = f"{base_username}_{counter}"
+                username = f"{base_username[:45]}_{counter}"
                 counter += 1
 
-            profile, _ = Profile.objects.get_or_create(
-                user=request.user,
-                tenant=invitation.tenant,
-                defaults={
-                    "username": username,
-                    "role": "member",
-                    "invited_by": invitation.invited_by,
-                    "accepted_by": request.user,
-                },
-            )
-            # Add to general room
-            general_room = ChatRooms.objects.filter(
-                tenant=invitation.tenant, name="general"
-            ).first()
-            if general_room:
-                RoomMembers.objects.get_or_create(room=general_room, profile=profile)
+            with tenant_rls_transaction(invitation.tenant_id):
+                profile, _ = Profile.objects.get_or_create(
+                    user=request.user,
+                    tenant=invitation.tenant,
+                    defaults={
+                        "username": username,
+                        "role": "member",
+                        "invited_by": invitation.invited_by,
+                        "accepted_by": request.user,
+                    },
+                )
+                general_room = ChatRooms.objects.filter(
+                    tenant=invitation.tenant, name="general"
+                ).first()
+                if general_room:
+                    RoomMembers.objects.get_or_create(
+                        room=general_room, profile=profile
+                    )
 
             return Response(
                 {
@@ -363,10 +383,15 @@ class RespondInvitationView(APIView):
                     "profile_id": profile.id,
                 }
             )
-        else:
+        elif action in ["decline", "declined", "reject"]:
             invitation.status = TenantInvitation.Status.DECLINED
             invitation.save()
             return Response({"message": "Invitation declined."})
+        else:
+            return Response(
+                {"error": "Invalid action. Choose 'accept' or 'decline'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class WorkspaceJoinRequestsView(ListAPIView):
@@ -392,10 +417,18 @@ class RespondJoinRequestView(APIView):
             join_req.status = TenantJoinRequest.Status.APPROVED
             join_req.save()
 
-            username = (
+            base_username = (
                 join_req.user.name.lower().replace(" ", "_")
                 or join_req.user.email.split("@")[0]
-            )
+            )[:50]
+            username = base_username
+            counter = 1
+            while Profile.objects.filter(
+                tenant=join_req.tenant, username=username
+            ).exists():
+                username = f"{base_username[:45]}_{counter}"
+                counter += 1
+
             profile, _ = Profile.objects.get_or_create(
                 user=join_req.user,
                 tenant=join_req.tenant,
@@ -414,7 +447,12 @@ class RespondJoinRequestView(APIView):
             return Response(
                 {"message": f"Approved {join_req.user.name} into workspace."}
             )
-        else:
+        elif action in ["reject", "rejected"]:
             join_req.status = TenantJoinRequest.Status.REJECTED
             join_req.save()
             return Response({"message": "Join request rejected."})
+        else:
+            return Response(
+                {"error": "Invalid action. Choose 'approve' or 'reject'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

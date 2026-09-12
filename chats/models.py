@@ -35,9 +35,7 @@ class RoomMembers(models.Model):
     profile = models.ForeignKey(
         "core.Profile", related_name="room_memberships", on_delete=models.CASCADE
     )
-    last_read_message = models.ForeignKey(
-        "Messages", related_name="+", on_delete=models.SET_NULL, null=True, blank=True
-    )
+    last_read_at = models.DateTimeField(null=True, blank=True)
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -83,6 +83,10 @@ class MemberSerializer(serializers.ModelSerializer):
 
     def get_is_online(self, obj):
         try:
+            # TODO: OPTIMIZE LATER (N+1)
+            # Doing 1 Redis call per item slows down large lists.
+            # FIX LATER: Use redis_conn.mget() in the View to batch-fetch
+            # all statuses at once, then pass them here via self.context.
             redis_conn = get_redis_connection("default")
             return bool(redis_conn.get(f"user:{obj.user_id}:is_online"))
         except Exception:

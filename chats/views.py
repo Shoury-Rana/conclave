@@ -1,8 +1,9 @@
 from datetime import datetime
 
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.generics import ListAPIView, ListCreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -37,7 +38,11 @@ class ChatRoomListCreateView(ListCreateAPIView):
         user = self.request.user
         return (
             ChatRooms.objects.filter(tenant_id=tenant_id)
-            .filter(members__profile__user=user)
+            .filter(
+                Q(type=RoomTypes.BROADCAST)
+                | Q(type=RoomTypes.TENANT_CHATS)
+                | Q(members__profile__user=user)
+            )
             .distinct()
             .order_by("name")
         )
@@ -47,9 +52,9 @@ class ChatRoomListCreateView(ListCreateAPIView):
         tenant = Tenant.objects.get(pk=tenant_id)
         room = serializer.save(tenant=tenant)
 
-        # Automatically join creator to newly created room
-        profile = Profile.objects.get(tenant=tenant, user=self.request.user)
-        RoomMembers.objects.get_or_create(room=room, profile=profile)
+        profile = Profile.objects.filter(tenant=tenant, user=self.request.user).first()
+        if profile:
+            RoomMembers.objects.get_or_create(room=room, profile=profile)
 
 
 @extend_schema(tags=["Chats"])
@@ -62,7 +67,13 @@ class ChatRoomJoinView(APIView):
         if not room:
             raise NotFound("Chat room not found.")
 
-        profile = Profile.objects.get(tenant_id=tenant_id, user=request.user)
+        if room.type == RoomTypes.DIRECT_MESSAGE:
+            raise PermissionDenied("You cannot explicitly join a direct message room.")
+
+        profile = Profile.objects.filter(tenant_id=tenant_id, user=request.user).first()
+        if not profile:
+            raise PermissionDenied("You are not a member of this workspace.")
+
         member, created = RoomMembers.objects.get_or_create(room=room, profile=profile)
 
         return Response(
@@ -81,7 +92,13 @@ class ChatRoomMessageListView(ListAPIView):
     permission_classes = [IsAuthenticated, IsTenantMember]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Messages.objects.none()
+
         room_id = self.kwargs.get("room_id")
+        if not room_id:
+            return Messages.objects.none()
+
         tenant_id = get_current_tenant_id()
         user = self.request.user
 
@@ -89,8 +106,10 @@ class ChatRoomMessageListView(ListAPIView):
         if not room:
             raise NotFound("Chat room not found.")
 
-        # Ensure user is a room member
         if not RoomMembers.objects.filter(room=room, profile__user=user).exists():
+            if room.type == RoomTypes.DIRECT_MESSAGE:
+                raise PermissionDenied("You do not have access to this direct message.")
+
             profile = Profile.objects.filter(tenant_id=tenant_id, user=user).first()
             if profile:
                 RoomMembers.objects.create(room=room, profile=profile)
@@ -99,7 +118,6 @@ class ChatRoomMessageListView(ListAPIView):
             "sender__profile__user"
         )
 
-        # Timestamp Cursor Pagination for Terminal Viewport (PageUp/Scroll)
         before_timestamp = self.request.query_params.get("before")
         limit = int(self.request.query_params.get("limit", 50))
         limit = min(max(limit, 1), 100)
@@ -109,9 +127,8 @@ class ChatRoomMessageListView(ListAPIView):
                 dt = datetime.fromisoformat(before_timestamp.replace("Z", "+00:00"))
                 queryset = queryset.filter(sent_at__lt=dt)
             except ValueError:
-                pass
+                raise ValidationError({"before": "Invalid ISO-8601 timestamp format."})
 
-        # Return latest messages sorted chronologically
         messages = list(queryset.order_by("-sent_at")[:limit])
         messages.reverse()
         return messages
@@ -131,23 +148,20 @@ class ChatRoomReadStateView(APIView):
             room=room, profile__user=request.user
         ).first()
         if not member:
-            return Response({"unread_count": 0, "last_read_message_id": None})
+            return Response({"unread_count": 0, "last_read_at": None})
 
-        last_read_id = (
-            str(member.last_read_message_id) if member.last_read_message_id else None
-        )
-        if not member.last_read_message:
+        if not member.last_read_at:
             unread_count = room.messages.count()
         else:
-            unread_count = room.messages.filter(
-                sent_at__gt=member.last_read_message.sent_at
-            ).count()
+            unread_count = room.messages.filter(sent_at__gt=member.last_read_at).count()
 
         return Response(
             {
                 "room_id": str(room.id),
                 "unread_count": unread_count,
-                "last_read_message_id": last_read_id,
+                "last_read_at": member.last_read_at.isoformat()
+                if member.last_read_at
+                else None,
             }
         )
 
@@ -172,9 +186,9 @@ class DirectMessageRoomView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        target_user = User.objects.filter(id=target_user_id).first()
+        target_user = User.objects.filter(id=target_user_id, is_active=True).first()
         if not target_user:
-            raise NotFound("Target user does not exist.")
+            raise NotFound("Target user does not exist or is inactive.")
 
         current_profile = Profile.objects.filter(
             tenant=tenant, user=current_user
@@ -187,7 +201,6 @@ class DirectMessageRoomView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Deterministic room name: dm_{min_id}_{max_id}
         ids = sorted([str(current_user.id), str(target_user_id)])
         dm_room_name = f"dm_{ids[0]}_{ids[1]}"
 

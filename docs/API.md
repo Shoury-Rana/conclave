@@ -93,7 +93,7 @@ Invite a user by email to the current workspace.
 List all chat channels and direct messages in the current workspace.
 
 ### `POST /chats/rooms/`
-Create a new chat room/channel.
+Create a new chat room/channel. (Note: Names cannot start with `dm_` prefix).
 - **Request Body:**
   ```json
   {
@@ -109,7 +109,15 @@ Get or create a 1-on-1 Direct Message room.
 Fetch chronological message history for terminal viewports with cursor pagination.
 
 ### `GET /chats/rooms/<uuid:room_id>/read-states/`
-Get unread badge count and last read message ID.
+Get unread badge count and timestamp of last read activity.
+- **Response:**
+  ```json
+  {
+    "room_id": "uuid",
+    "unread_count": 0,
+    "last_read_at": "2026-08-16T12:00:00Z"
+  }
+  ```
 
 ---
 
@@ -137,6 +145,8 @@ Get unread badge count and last read message ID.
 3. **Typing Indicator:**
    ```json
    { "type": "typing_start" }
+   ```
+   ```json
    { "type": "typing_stop" }
    ```
 

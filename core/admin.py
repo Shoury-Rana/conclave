@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from core.models import Profile, Tenant, User
+from core.models import Profile, Tenant, TenantInvitation, TenantJoinRequest, User
 
 
 @admin.register(Profile)
@@ -15,4 +15,14 @@ class TenantAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(TenantInvitation)
+class TenantInvitationAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(TenantJoinRequest)
+class TenantJoinRequestAdmin(admin.ModelAdmin):
     pass

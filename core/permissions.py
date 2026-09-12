@@ -27,4 +27,20 @@ class IsTenantMember(permissions.BasePermission):
         tenant_id = get_current_tenant_id()
         if not tenant_id:
             return False
-        return Profile.objects.filter(tenant_id=tenant_id, user=request.user).exists()
+        return (
+            Profile.objects.filter(tenant_id=tenant_id, user=request.user).exists()
+            or Tenant.objects.filter(pk=tenant_id, created_by=request.user).exists()
+        )
+
+    def has_object_permission(self, request, view, obj):
+        tenant_id = (
+            get_current_tenant_id()
+            or getattr(obj, "tenant_id", None)
+            or getattr(getattr(obj, "room", None), "tenant_id", None)
+        )
+        if not tenant_id:
+            return False
+        return (
+            Profile.objects.filter(tenant_id=tenant_id, user=request.user).exists()
+            or Tenant.objects.filter(pk=tenant_id, created_by=request.user).exists()
+        )
