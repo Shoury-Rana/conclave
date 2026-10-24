@@ -250,7 +250,7 @@ class TenantDetailView(APIView):
                 {
                     "name": "Conclave Chat API",
                     "version": "1.0.0",
-                    "detail": "Root domain API. Use subdomain (e.g. acme.lvh.me:8000) or 'X-Tenant' header to access workspace.",
+                    "detail": "Root domain API. Access workspace endpoints via tenant subdomain (e.g. acme.lvh.me:8000).",
                 },
                 status=status.HTTP_200_OK,
             )

@@ -23,21 +23,22 @@ Adopt a **shared-database, shared-schema** model enforced by **PostgreSQL Row-Le
 
 ---
 
-## ADR 002: Subdomain-Based Tenant Routing with Header Fallbacks
+## ADR 002: Strict Subdomain-Based Tenant Routing
 
 ### Context
-Workspaces need clean namespace separation and distinct URLs while supporting both browser clients and CLI/terminal environments.
+Workspaces need clean namespace separation and distinct URLs. The architecture must enforce strict tenant boundaries without ambiguous routing paths or headers that can be spoofed.
 
 ### Decision
-Extract tenant names from the HTTP Host header subdomain (`<tenant>.conclave.app`). Provide fallback support for `X-Tenant` headers and query parameters (`?tenant=acme`) for local development, test suites, and terminal environments.
+Extract tenant names strictly from the HTTP Host header subdomain (`<tenant>.conclave.app` in production, `<tenant>.lvh.me` in local development). Header fallbacks like `X-Tenant` were evaluated and explicitly removed.
 
 ### Alternatives Considered
-- **Path-based routing (`conclave.app/<tenant>/...`):** Complicates cookie isolation, routing tables, and URL nesting.
+- **Header-based overrides (`X-Tenant: acme`):** Weakened the core subdomain isolation model, allowed multiple conflicting ways to declare tenancy, and introduced header spoofing concerns.
+- **Path-based routing (`conclave.app/<tenant>/...`):** Complicates clean REST route structures and URL nesting for TUI clients.
 - **Token-embedded tenancy:** Prevents users from accessing public workspace landing pages prior to authenticating.
 
 ### Consequences
-- **Pros:** Natural workspace boundaries, clean API URLs, friendly for multi-tab browser usage.
-- **Cons:** Requires wildcard DNS and SSL certificates (`*.conclave.app`) in production.
+- **Pros:** Natural workspace boundaries, clean API URLs, architectural purity, and predictable routing for TUI sessions.
+- **Cons:** Requires wildcard DNS resolution (`*.conclave.app` or `*.lvh.me` for local testing).
 
 ---
 
@@ -62,7 +63,7 @@ $$\text{name} = \text{"dm_"} + \min(\text{user}_A, \text{user}_B) + \text{"_"} +
 ## ADR 004: Stateless JWT Authentication for HTTP and WebSockets
 
 ### Context
-Clients include terminal UIs, scripts, and web browsers. WebSockets cannot easily send custom HTTP headers during standard browser handshakes.
+Clients are keyboard-driven Terminal UIs (TUIs) and CLI scripts. WebSockets cannot easily send standard custom headers during initial protocol handshakes across different client libraries.
 
 ### Decision
 Use **JSON Web Tokens (SimpleJWT)**. For WebSockets, allow token transmission via:

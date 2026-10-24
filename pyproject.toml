@@ -1,7 +1,7 @@
 [project]
 name = "conclave-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Subdomain-based multi-tenant real-time chat backend for TUI clients"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [

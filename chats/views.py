@@ -39,8 +39,7 @@ class ChatRoomListCreateView(ListCreateAPIView):
         return (
             ChatRooms.objects.filter(tenant_id=tenant_id)
             .filter(
-                Q(type=RoomTypes.BROADCAST)
-                | Q(type=RoomTypes.TENANT_CHATS)
+                Q(type=RoomTypes.TENANT_CHATS)
                 | Q(members__profile__user=user)
             )
             .distinct()

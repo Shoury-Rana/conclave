@@ -12,7 +12,7 @@ class ChatRooms(models.Model):
         "core.Tenant", related_name="chat_rooms", on_delete=models.CASCADE
     )
     type = models.CharField(
-        max_length=32, choices=RoomTypes.choices, default=RoomTypes.BROADCAST
+        max_length=32, choices=RoomTypes.choices, default=RoomTypes.TENANT_CHATS
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
