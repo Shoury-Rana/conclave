@@ -7,7 +7,7 @@ Conclave is structured as a decoupled, multi-tier asynchronous architecture supp
 ```
                   ┌────────────────────────────────────────┐
                   │                Clients                 │
-                  │   (Terminal TUI Client / Web App)      │
+                  │        (Terminal TUI Client)           │
                   └──────────────────┬─────────────────────┘
                                      │
                    HTTP/REST (HTTPS) │ WebSockets (WSS)
@@ -41,7 +41,7 @@ Conclave is structured as a decoupled, multi-tier asynchronous architecture supp
 
 ## 2. Core Components
 
-### A. Client Layer (TUI & Web)
+### A. Client Layer (TUI Client)
 - **TUI Client:** Terminal interface built with Python/Textual or Go/Bubbletea. Communicates over HTTPS for state initialization and persistent WebSockets for live chat streaming.
 
 ### B. ASGI Server & Routing
@@ -131,7 +131,7 @@ Client (TUI)                                                   DRF View / Databa
 │ PK  id (BigInt)         │ 1            * │ PK  id (UUID)           │
 │ FK  user_id             ├────────────────┤ FK  tenant_id           │
 │ FK  tenant_id           │ (memberships)  │     name                │
-│     username            │                │     type (BROADCAST/DM) │
+│     username            │                │     type (TENANT_CHATS/DM)│
 │     role                │                └───────────┬─────────────┘
 └───────────┬─────────────┘                            │ 1
             │ 1                                        │

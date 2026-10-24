@@ -2,9 +2,9 @@
 
 ## 1. Executive Summary
 
-**Conclave** is an open, high-performance, multi-tenant real-time chat platform engineered for developer teams, sysadmins, and communities. It combines strict tenant isolation, PostgreSQL Row-Level Security (RLS), stateless JWT authentication, and bi-directional WebSocket event streaming. 
+**Conclave** is an open, high-performance, multi-tenant real-time chat platform engineered specifically for **Terminal User Interfaces (TUIs)** and CLI clients. It combines strict tenant isolation, PostgreSQL Row-Level Security (RLS), stateless JWT authentication, and bi-directional WebSocket event streaming. 
 
-While Conclave supports web clients, it is intentionally optimized for **Terminal User Interfaces (TUIs)** and CLI clients, offering low-overhead JSON REST endpoints, predictable cursor pagination, and reliable WebSocket event streaming.
+Conclave is intentionally tailored for terminal workflows, offering low-overhead JSON REST endpoints, predictable timestamp cursor pagination for line-based viewports, and reliable WebSocket event streaming.
 
 ---
 
@@ -35,7 +35,7 @@ Conclave solves this by pairing a **subdomain-isolated, RLS-backed backend** wit
 - Dynamic subdomain routing maps `acme.conclave.app` directly to the `acme` workspace.
 
 ### B. Channel & Direct Messaging
-- **Broadcast / Channels:** Public or team-wide channels within a workspace (e.g., `#general`, `#devops`).
+- **Workspace Channels:** Team-wide chat channels within a workspace (e.g., `#general`, `#devops`).
 - **1-on-1 Direct Messages (DMs):** Deterministically resolved DM rooms between workspace members without duplicating channel infrastructure.
 - **Message History & Viewport Scrolling:** Timestamp-based cursor pagination (`?limit=50&before=<timestamp>`) designed for terminal `PageUp` / scrollback buffers.
 
@@ -53,7 +53,7 @@ Conclave solves this by pairing a **subdomain-isolated, RLS-backed backend** wit
 |---|---|
 | **Identity Model** | Global identity (`User`); tenant-scoped membership profile (`Profile`). |
 | **Data Isolation** | Shared-database, shared-schema enforced via PostgreSQL Row-Level Security (RLS) + Django Middleware. |
-| **Tenant Routing** | Primary: HTTP Host subdomain (`<tenant>.domain.com`). Fallback: `X-Tenant` header / `?tenant=` query param. |
+| **Tenant Routing** | Strictly HTTP Host subdomain (`<tenant>.domain.com` in prod, `<tenant>.lvh.me` in local dev). |
 | **Authentication** | Stateless JWT (Access + Refresh tokens with blacklisting on rotation). |
 | **Realtime Transport** | ASGI WebSockets via Django Channels backed by Redis Channel Layer. |
 | **Database Engine** | PostgreSQL 14+ (relies on PostgreSQL `set_config` and RLS policies). SQLite supported in dev/tests. |

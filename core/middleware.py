@@ -2,7 +2,6 @@ import re
 
 from django.conf import settings
 from django.db import connection, transaction
-from django.db.models import Q
 from django.http import Http404, JsonResponse
 
 from core.contexts import _current_tenant_id
@@ -11,8 +10,8 @@ from core.models import Tenant
 
 class SubDomainMiddleware:
     """
-    Resolves tenant context from request subdomain, X-Tenant header, or query param.
-    Configures PostgreSQL RLS session variables when available.
+    Resolves tenant context strictly from the request subdomain (e.g. <tenant>.conclave.app).
+    Configures PostgreSQL RLS session variables for tenant isolation.
     Bypasses root-domain endpoints (auth, search, my tenants, swagger).
     """
 
@@ -41,19 +40,7 @@ class SubDomainMiddleware:
         if is_ignored:
             return self.get_response(request)
 
-        tenant_param = request.headers.get("X-Tenant") or request.GET.get("tenant")
-        if tenant_param:
-            tenant_param = tenant_param.strip()
-            tenant = Tenant.objects.filter(
-                Q(name__iexact=tenant_param) | Q(id__iexact=tenant_param)
-            ).first()
-            if not tenant:
-                return JsonResponse(
-                    {"error": f"Tenant '{tenant_param}' not found."}, status=404
-                )
-            return self._process_tenant_request(request, tenant)
-
-        # 2. Check Host subdomain
+        # Resolve tenant strictly from Host subdomain
         host = request.get_host().split(":")[0]
         host_parts = host.split(".")
         base_domain_length = int(getattr(settings, "BASE_DOMAIN_LENGTH", 2))

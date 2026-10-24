@@ -4,7 +4,6 @@ from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 from django.conf import settings
-from django.db.models import Q
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
@@ -17,7 +16,7 @@ class WebSocketScopeMiddleware(BaseMiddleware):
     """
     Authenticates WebSocket connections using JWT tokens passed via
     query string, Authorization header, or sec-websocket-protocol.
-    Resolves tenant context and requested room identifiers.
+    Resolves tenant context strictly via host subdomain.
     """
 
     async def __call__(self, scope, receive, send):
@@ -88,23 +87,7 @@ class WebSocketScopeMiddleware(BaseMiddleware):
                 Tenant.objects.filter(name__iexact=subdomain).first
             )()
 
-        if not tenant and b"x-tenant" in headers:
-            tenant_hdr = headers[b"x-tenant"].decode("utf-8").strip()
-            tenant = await database_sync_to_async(
-                Tenant.objects.filter(
-                    Q(name__iexact=tenant_hdr) | Q(id__iexact=tenant_hdr)
-                ).first
-            )()
-
-        if not tenant and "tenant" in query_params:
-            tenant_param = query_params["tenant"][0].strip()
-            tenant = await database_sync_to_async(
-                Tenant.objects.filter(
-                    Q(name__iexact=tenant_param) | Q(id__iexact=tenant_param)
-                ).first
-            )()
-
-        # Fallback: resolve tenant from requested room_id
+        # Fallback: resolve tenant from requested room_id if room was targeted
         if not tenant and scope.get("room_id"):
             room = await database_sync_to_async(
                 ChatRooms.objects.filter(id=scope["room_id"])
